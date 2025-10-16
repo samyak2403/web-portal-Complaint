@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Web Portal</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- Login Screen -->
+    <section id="login-section" class="container">
+      <div class="card auth">
+        <h1>Admin Web Portal</h1>
+        <p class="subtitle">Sign in to manage admins and complaints</p>
+
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="admin@example.com" />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="••••••••" />
+        </div>
+        <button id="btn-login" class="btn primary">Sign in</button>
+        <p id="login-error" class="error"></p>
+        <p class="auth-switch">Don't have an account? <a href="#" id="show-register">Register here</a></p>
+      </div>
+    </section>
+
+    <!-- Registration Screen -->
+    <section id="register-section" class="container hidden">
+      <div class="card auth">
+        <h1>Admin Registration</h1>
+        <p class="subtitle">Register to become an admin (approval required)</p>
+
+        <div class="form-group">
+          <label for="reg-fullname">Full Name</label>
+          <input id="reg-fullname" type="text" placeholder="John Doe" required />
+        </div>
+        <div class="form-group">
+          <label for="reg-email">Email</label>
+          <input id="reg-email" type="email" placeholder="admin@example.com" required />
+        </div>
+        <div class="form-group">
+          <label for="reg-college">College Name</label>
+          <input id="reg-college" type="text" placeholder="ABC College" required />
+        </div>
+        <div class="form-group">
+          <label for="reg-department">Department</label>
+          <input id="reg-department" type="text" placeholder="Computer Science" required />
+        </div>
+        <div class="form-group">
+          <label for="reg-designation">Designation</label>
+          <input id="reg-designation" type="text" placeholder="Professor" required />
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Password</label>
+          <input id="reg-password" type="password" placeholder="••••••••" required />
+        </div>
+        <div class="form-group">
+          <label for="reg-confirm-password">Confirm Password</label>
+          <input id="reg-confirm-password" type="password" placeholder="••••••••" required />
+        </div>
+        <button id="btn-register" class="btn primary">Register</button>
+        <p id="register-error" class="error"></p>
+        <p class="auth-switch">Already have an account? <a href="#" id="show-login">Sign in here</a></p>
+      </div>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="dashboard" class="hidden">
+      <header class="topbar">
+        <div class="brand">Admin Web Portal</div>
+        <div class="spacer"></div>
+        <div id="current-user" class="user"></div>
+        <button id="btn-logout" class="btn outline small">Logout</button>
+      </header>
+
+      <div class="content">
+        <aside class="sidebar">
+          <nav>
+            <button class="nav-link active" data-target="admins-view">Admins</button>
+            <button class="nav-link" data-target="complaints-view">Complaints</button>
+          </nav>
+        </aside>
+
+        <main class="main">
+          <!-- Admins View -->
+          <section id="admins-view" class="view">
+            <h2>Admins</h2>
+            <div class="cards">
+              <div class="stat-card">
+                <div class="stat-title">Total</div>
+                <div id="admins-total" class="stat-value">-</div>
+              </div>
+              <div class="stat-card pending">
+                <div class="stat-title">Pending</div>
+                <div id="admins-pending" class="stat-value">-</div>
+              </div>
+              <div class="stat-card approved">
+                <div class="stat-title">Approved</div>
+                <div id="admins-approved" class="stat-value">-</div>
+              </div>
+              <div class="stat-card rejected">
+                <div class="stat-title">Rejected</div>
+                <div id="admins-rejected" class="stat-value">-</div>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <div class="form-group inline">
+                <label for="admin-status-filter">Status</label>
+                <select id="admin-status-filter">
+                  <option>All</option>
+                  <option>Pending</option>
+                  <option>Approved</option>
+                  <option>Rejected</option>
+                </select>
+              </div>
+              <div class="form-group inline">
+                <label for="admin-search">Search</label>
+                <input id="admin-search" type="text" placeholder="Name, email, college, department" />
+              </div>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>College</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Status</th>
+                    <th>Active</th>
+                    <th>Registered</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="admins-tbody">
+                  <!-- Rows injected by JS -->
+                </tbody>
+              </table>
+              <div id="admins-empty" class="empty hidden">No admins found.</div>
+            </div>
+          </section>
+
+          <!-- Complaints View -->
+          <section id="complaints-view" class="view hidden">
+            <h2>Complaints</h2>
+            <div class="toolbar">
+              <div class="form-group inline">
+                <label for="complaint-status-filter">Status</label>
+                <select id="complaint-status-filter">
+                  <option>All</option>
+                  <option>Pending</option>
+                  <option>In Progress</option>
+                  <option>Resolved</option>
+                  <option>Rejected</option>
+                </select>
+              </div>
+              <div class="form-group inline">
+                <label for="complaint-search">Search</label>
+                <input id="complaint-search" type="text" placeholder="Title, category, description" />
+              </div>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Submitted</th>
+                    <th>Anon ID</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="complaints-tbody">
+                  <!-- Rows injected by JS -->
+                </tbody>
+              </table>
+              <div id="complaints-empty" class="empty hidden">No complaints found.</div>
+            </div>
+
+            <!-- Modal for updating complaint -->
+            <dialog id="complaint-modal">
+              <form method="dialog" class="modal">
+                <h3 id="modal-title">Update Complaint</h3>
+                <div id="modal-body"></div>
+                <menu class="modal-actions">
+                  <button value="cancel" class="btn">Cancel</button>
+                  <button id="modal-save" value="default" class="btn primary">Save</button>
+                </menu>
+              </form>
+            </dialog>
+          </section>
+        </main>
+      </div>
+    </section>
+  </div>
+
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script src="app.js"></script>
+</body>
+</html>
+

@@ -30,9 +30,10 @@
   const showRegisterLink = document.getElementById('show-register');
   const showLoginLink = document.getElementById('show-login');
 
-  const navLinks = document.querySelectorAll('.nav-link');
+  const navTabs = document.querySelectorAll('.nav-link');
   const adminsView = document.getElementById('admins-view');
   const complaintsView = document.getElementById('complaints-view');
+  const breadcrumbText = document.getElementById('breadcrumb-text');
 
   // Admins UI
   const adminStatusFilter = document.getElementById('admin-status-filter');
@@ -52,6 +53,10 @@
   const complaintModal = document.getElementById('complaint-modal');
   const modalBody = document.getElementById('modal-body');
   const modalSave = document.getElementById('modal-save');
+
+  // Admin Details Modal
+  const adminDetailsModal = document.getElementById('admin-details-modal');
+  const adminModalBody = document.getElementById('admin-modal-body');
 
   let adminsCache = [];
   let complaintsCache = [];
@@ -77,13 +82,17 @@
   }
 
   // Navigation between views
-  navLinks.forEach(btn => {
+  navTabs.forEach(btn => {
     btn.addEventListener('click', () => {
-      navLinks.forEach(b => b.classList.remove('active'));
+      navTabs.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const tgt = btn.getAttribute('data-target');
       [adminsView, complaintsView].forEach(v => v.classList.add('hidden'));
       document.getElementById(tgt).classList.remove('hidden');
+      
+      // Update breadcrumb if present
+      const viewName = btn.textContent;
+      if (breadcrumbText) breadcrumbText.textContent = viewName;
     });
   });
 
@@ -167,8 +176,8 @@
         collegeName: college,
         department,
         designation,
-        status: 'Pending',
-        isActive: false,
+        status: 'Approved',
+        isActive: true,
         registrationTimestamp: Date.now()
       });
 
@@ -274,7 +283,10 @@
         <td>${a.isActive ? 'Yes' : 'No'}</td>
         <td>${formatDate(a.registrationTimestamp)}</td>
         <td>
-          ${actionButtonsForAdmin(a)}
+          <div class="actions">
+            <button class="btn small primary btn-view-details">View</button>
+            ${actionButtonsForAdmin(a)}
+          </div>
         </td>
       `;
       attachAdminActions(tr, a);
@@ -295,18 +307,23 @@
     const canActivate = a.status === 'Approved' && a.isActive !== true;
 
     return `
-      ${canApprove ? '<button class="btn success btn-approve">Approve</button>' : ''}
-      ${canReject ? '<button class="btn danger btn-reject">Reject</button>' : ''}
-      ${canDeactivate ? '<button class="btn warning btn-deactivate">Deactivate</button>' : ''}
-      ${canActivate ? '<button class="btn success btn-activate">Activate</button>' : ''}
+      ${canApprove ? '<button class="btn small success btn-approve">Approve</button>' : ''}
+      ${canReject ? '<button class="btn small danger btn-reject">Reject</button>' : ''}
+      ${canDeactivate ? '<button class="btn small warning btn-deactivate">Deactivate</button>' : ''}
+      ${canActivate ? '<button class="btn small success btn-activate">Activate</button>' : ''}
     `;
   }
 
   function attachAdminActions(tr, a) {
+    const viewDetailsBtn = tr.querySelector('.btn-view-details');
     const approveBtn = tr.querySelector('.btn-approve');
     const rejectBtn = tr.querySelector('.btn-reject');
     const deactivateBtn = tr.querySelector('.btn-deactivate');
     const activateBtn = tr.querySelector('.btn-activate');
+
+    if (viewDetailsBtn) {
+      viewDetailsBtn.addEventListener('click', () => openAdminDetailsModal(a));
+    }
 
     if (approveBtn) {
       approveBtn.addEventListener('click', async () => {
@@ -371,6 +388,67 @@
 
   adminStatusFilter.addEventListener('change', renderAdmins);
   adminSearch.addEventListener('input', renderAdmins);
+
+  // Admin details modal
+  function openAdminDetailsModal(a) {
+    adminModalBody.innerHTML = `
+      <div class="form-group">
+        <label>Admin ID</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 12px;">${a.adminId || '-'}</div>
+      </div>
+      <div class="form-group">
+        <label>Full Name</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${a.fullName || '-'}</div>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${a.email || '-'}</div>
+      </div>
+      <div class="form-group">
+        <label>College Name</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${a.collegeName || '-'}</div>
+      </div>
+      <div class="form-group">
+        <label>Department</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${a.department || '-'}</div>
+      </div>
+      <div class="form-group">
+        <label>Designation</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${a.designation || '-'}</div>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <div style="padding: 8px;">${badge(a.status)}</div>
+      </div>
+      <div class="form-group">
+        <label>Active</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${a.isActive ? 'Yes' : 'No'}</div>
+      </div>
+      <div class="form-group">
+        <label>Registration Date</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${formatDate(a.registrationTimestamp)}</div>
+      </div>
+      ${a.approvalTimestamp ? `
+        <div class="form-group">
+          <label>Approval Date</label>
+          <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${formatDate(a.approvalTimestamp)}</div>
+        </div>
+      ` : ''}
+      ${a.approvedBy ? `
+        <div class="form-group">
+          <label>Approved By</label>
+          <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${a.approvedBy}</div>
+        </div>
+      ` : ''}
+      ${a.rejectionReason ? `
+        <div class="form-group">
+          <label>Rejection Reason</label>
+          <div style="padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">${a.rejectionReason}</div>
+        </div>
+      ` : ''}
+    `;
+    adminDetailsModal.showModal();
+  }
 
   // Click stat cards to filter
   document.getElementById('admins-pending').parentElement.addEventListener('click', () => {
@@ -475,7 +553,7 @@
         <td>${formatDate(ts)}</td>
         <td>${anon}</td>
         <td>
-          <button class="btn primary btn-edit-complaint">Update</button>
+          <button class="btn small primary btn-edit-complaint">Update</button>
         </td>
       `;
       tr.querySelector('.btn-edit-complaint').addEventListener('click', () => openComplaintModal(c));

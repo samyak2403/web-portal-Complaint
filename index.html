@@ -106,6 +106,20 @@
             </svg>
             <span>Analytics</span>
           </button>
+             <button class="nav-link" data-target="chat-view">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>Chat</span>
+          </button>
+          <button class="nav-link" data-target="profile-view">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>Profile</span>
+          </button>
         </nav>
         <div class="spacer"></div>
         <div id="current-user" class="user"></div>
@@ -303,6 +317,126 @@
             <div class="chart-card">
               <h3>Priority Distribution</h3>
               <div id="priority-chart" class="chart-bars"></div>
+            </div>
+          </section>
+
+          <!-- Chat View -->
+          <section id="chat-view" class="view hidden">
+            <h2>Admin Chats</h2>
+            
+            <!-- Pending Requests -->
+            <div id="pending-requests-section">
+              <h3 style="color: var(--muted); font-size: 16px; margin: 16px 0 12px;">Pending Chat Requests</h3>
+              <div id="pending-requests-list" class="chat-requests-grid"></div>
+              <div id="no-pending-requests" class="empty hidden">No pending chat requests</div>
+            </div>
+
+            <!-- Active Chats -->
+            <div id="active-chats-section">
+              <h3 style="color: var(--muted); font-size: 16px; margin: 16px 0 12px;">Active Chats</h3>
+              <div id="active-chats-list" class="chat-requests-grid"></div>
+              <div id="no-active-chats" class="empty hidden">No active chats</div>
+            </div>
+
+            <!-- Ended Chats -->
+            <div id="ended-chats-section">
+              <h3 style="color: var(--muted); font-size: 16px; margin: 16px 0 12px;">Ended Chats</h3>
+              <div id="ended-chats-list" class="chat-requests-grid"></div>
+              <div id="no-ended-chats" class="empty hidden">No ended chats</div>
+            </div>
+          </section>
+
+          <!-- Chat Window Modal -->
+          <dialog id="chat-window-modal">
+            <div class="chat-modal">
+              <div class="chat-header">
+                <div>
+                  <h3 id="chat-admin-name" style="margin: 0;">Chat</h3>
+                  <p id="chat-admin-email" style="margin: 4px 0 0; color: var(--muted); font-size: 13px;"></p>
+                </div>
+                <button id="btn-close-chat" class="btn small">Close</button>
+              </div>
+              
+              <div id="typing-indicator" class="typing-indicator hidden">
+                <span>Admin is typing</span>
+                <span class="typing-dots">
+                  <span>.</span><span>.</span><span>.</span>
+                </span>
+              </div>
+              
+              <div id="chat-messages" class="chat-messages"></div>
+              
+              <div class="chat-input-container">
+                <textarea id="chat-input" placeholder="Type a message..." rows="2"></textarea>
+                <button id="btn-send-message" class="btn primary">Send</button>
+              </div>
+            </div>
+          </dialog>
+
+          <!-- Profile View -->
+          <section id="profile-view" class="view hidden">
+            <h2>My Profile</h2>
+            <div class="card profile-card">
+              <div id="profile-display">
+                <div class="form-group">
+                  <label>Admin ID</label>
+                  <div class="profile-value" id="profile-id-display">-</div>
+                </div>
+                <div class="form-group">
+                  <label>Full Name</label>
+                  <div class="profile-value" id="profile-name-display">-</div>
+                </div>
+                <div class="form-group">
+                  <label>Email</label>
+                  <div class="profile-value" id="profile-email-display">-</div>
+                </div>
+                <div class="form-group">
+                  <label>College Name</label>
+                  <div class="profile-value" id="profile-college-display">-</div>
+                </div>
+                <div class="form-group">
+                  <label>Department</label>
+                  <div class="profile-value" id="profile-department-display">-</div>
+                </div>
+                <div class="form-group">
+                  <label>Designation</label>
+                  <div class="profile-value" id="profile-designation-display">-</div>
+                </div>
+                <div class="form-group">
+                  <label>Status</label>
+                  <div class="profile-value" id="profile-status-display">-</div>
+                </div>
+                <div class="form-group">
+                  <label>Registration Date</label>
+                  <div class="profile-value" id="profile-reg-date-display">-</div>
+                </div>
+                <button id="btn-edit-profile" class="btn primary">Edit Profile</button>
+              </div>
+
+              <div id="profile-edit" class="hidden">
+                <div class="form-group">
+                  <label for="profile-name-edit">Full Name</label>
+                  <input id="profile-name-edit" type="text" placeholder="Full Name" />
+                </div>
+                <div class="form-group">
+                  <label for="profile-college-edit">College Name</label>
+                  <input id="profile-college-edit" type="text" placeholder="College Name" />
+                </div>
+                <div class="form-group">
+                  <label for="profile-department-edit">Department</label>
+                  <input id="profile-department-edit" type="text" placeholder="Department" />
+                </div>
+                <div class="form-group">
+                  <label for="profile-designation-edit">Designation</label>
+                  <input id="profile-designation-edit" type="text" placeholder="Designation" />
+                </div>
+                <div class="form-actions">
+                  <button id="btn-cancel-profile" class="btn">Cancel</button>
+                  <button id="btn-update-profile" class="btn primary">Update Profile</button>
+                </div>
+                <p id="profile-update-error" class="error"></p>
+                <p id="profile-update-success" class="success"></p>
+              </div>
             </div>
           </section>
 

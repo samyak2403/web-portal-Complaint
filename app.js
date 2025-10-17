@@ -34,6 +34,8 @@
   const adminsView = document.getElementById('admins-view');
   const complaintsView = document.getElementById('complaints-view');
   const analyticsView = document.getElementById('analytics-view');
+  const chatView = document.getElementById('chat-view');
+  const profileView = document.getElementById('profile-view');
   const breadcrumbText = document.getElementById('breadcrumb-text');
 
   // Admins UI
@@ -75,6 +77,7 @@
   let adminsCache = [];
   let complaintsCache = [];
   let selectedComplaint = null;
+  let currentAdminProfile = null;
 
   function show(el) { el.classList.remove('hidden'); }
   function hide(el) { el.classList.add('hidden'); }
@@ -101,7 +104,7 @@
       navTabs.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const tgt = btn.getAttribute('data-target');
-      [adminsView, complaintsView, analyticsView].forEach(v => v.classList.add('hidden'));
+      [adminsView, complaintsView, analyticsView, chatView, profileView].forEach(v => v.classList.add('hidden'));
       document.getElementById(tgt).classList.remove('hidden');
       
       // Update breadcrumb if present
@@ -111,6 +114,16 @@
       // Load analytics when switching to analytics view
       if (tgt === 'analytics-view') {
         renderAnalytics();
+      }
+      
+      // Load profile when switching to profile view
+      if (tgt === 'profile-view') {
+        renderProfile();
+      }
+      
+      // Load chat when switching to chat view
+      if (tgt === 'chat-view') {
+        loadChatRequests();
       }
     });
   });
@@ -246,6 +259,7 @@
   });
 
   function onLoggedIn(user, adminProfile) {
+    currentAdminProfile = { ...adminProfile, adminId: user.uid };
     currentUserEl.textContent = `${adminProfile.fullName || user.email} • ${user.email}`;
     hide(loginSection); show(dashboard);
     loadAdmins();
@@ -594,7 +608,27 @@
     selectedComplaint = c;
     const currentStatus = c.status || c.state || c.complaintStatus || 'Pending';
     const currentPriority = c.priority || c.level || 'Medium';
+    const title = c.title || c.problem || c.subject || '-';
+    const category = c.category || c.type || c.categoryName || '-';
+    const description = c.description || c.details || '-';
+    const ts = c.timestamp || c.createdAt || c.created_on || c.createdOn;
     modalBody.innerHTML = `
+      <div class="form-group">
+        <label>Title</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${title}</div>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${category}</div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px; max-height: 150px; overflow-y: auto;">${description}</div>
+      </div>
+      <div class="form-group">
+        <label>Submitted</label>
+        <div style="padding: 8px; background: #f5f5f5; border-radius: 4px;">${formatDate(ts)}</div>
+      </div>
       <div class="form-group">
         <label>Status</label>
         <select id="modal-status">
@@ -876,5 +910,535 @@
       trendChart.appendChild(bar);
     });
   }
+
+  // Profile View
+  const profileDisplay = document.getElementById('profile-display');
+  const profileEdit = document.getElementById('profile-edit');
+  const btnEditProfile = document.getElementById('btn-edit-profile');
+  const btnCancelProfile = document.getElementById('btn-cancel-profile');
+  const btnUpdateProfile = document.getElementById('btn-update-profile');
+  const profileUpdateError = document.getElementById('profile-update-error');
+  const profileUpdateSuccess = document.getElementById('profile-update-success');
+
+  function renderProfile() {
+    if (!currentAdminProfile) return;
+
+    // Display mode
+    document.getElementById('profile-id-display').textContent = currentAdminProfile.adminId || '-';
+    document.getElementById('profile-name-display').textContent = currentAdminProfile.fullName || '-';
+    document.getElementById('profile-email-display').textContent = currentAdminProfile.email || '-';
+    document.getElementById('profile-college-display').textContent = currentAdminProfile.collegeName || '-';
+    document.getElementById('profile-department-display').textContent = currentAdminProfile.department || '-';
+    document.getElementById('profile-designation-display').textContent = currentAdminProfile.designation || '-';
+    document.getElementById('profile-status-display').innerHTML = badge(currentAdminProfile.status);
+    document.getElementById('profile-reg-date-display').textContent = formatDate(currentAdminProfile.registrationTimestamp);
+
+    // Edit mode
+    document.getElementById('profile-name-edit').value = currentAdminProfile.fullName || '';
+    document.getElementById('profile-college-edit').value = currentAdminProfile.collegeName || '';
+    document.getElementById('profile-department-edit').value = currentAdminProfile.department || '';
+    document.getElementById('profile-designation-edit').value = currentAdminProfile.designation || '';
+
+    // Reset to display mode
+    show(profileDisplay);
+    hide(profileEdit);
+    profileUpdateError.textContent = '';
+    profileUpdateSuccess.textContent = '';
+  }
+
+  btnEditProfile.addEventListener('click', () => {
+    hide(profileDisplay);
+    show(profileEdit);
+    profileUpdateError.textContent = '';
+    profileUpdateSuccess.textContent = '';
+  });
+
+  btnCancelProfile.addEventListener('click', () => {
+    renderProfile();
+  });
+
+  btnUpdateProfile.addEventListener('click', async () => {
+    profileUpdateError.textContent = '';
+    profileUpdateSuccess.textContent = '';
+
+    const fullName = document.getElementById('profile-name-edit').value.trim();
+    const collegeName = document.getElementById('profile-college-edit').value.trim();
+    const department = document.getElementById('profile-department-edit').value.trim();
+    const designation = document.getElementById('profile-designation-edit').value.trim();
+
+    if (!fullName || !collegeName || !department || !designation) {
+      profileUpdateError.textContent = 'All fields are required.';
+      return;
+    }
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      await db.ref(`admins/${user.uid}`).update({
+        fullName,
+        collegeName,
+        department,
+        designation,
+      });
+
+      // Update local profile
+      currentAdminProfile.fullName = fullName;
+      currentAdminProfile.collegeName = collegeName;
+      currentAdminProfile.department = department;
+      currentAdminProfile.designation = designation;
+
+      // Update header display
+      currentUserEl.textContent = `${fullName} • ${user.email}`;
+
+      profileUpdateSuccess.textContent = 'Profile updated successfully!';
+      setTimeout(() => {
+        renderProfile();
+      }, 1500);
+    } catch (e) {
+      profileUpdateError.textContent = e.message || 'Failed to update profile';
+    }
+  });
+
+  // ========================================
+  // CHAT FUNCTIONALITY
+  // ========================================
+  
+  let chatRequestsCache = [];
+  let activeChatAdminId = null;
+  let messagesListener = null;
+  let typingListener = null;
+  let typingTimeout = null;
+
+  // Load chat requests and approved chats
+  function loadChatRequests() {
+    // Listen to chatRequests
+    db.ref('chatRequests').on('value', (snap) => {
+      chatRequestsCache = [];
+      if (snap.exists()) {
+        snap.forEach(s => {
+          const req = s.val();
+          req.adminId = s.key;
+          chatRequestsCache.push(req);
+        });
+      }
+      renderChatRequests();
+    });
+
+    // Listen to chatStatus for approved and ended chats
+    db.ref('chatStatus').on('value', (snap) => {
+      const approvedChats = [];
+      const endedChats = [];
+      if (snap.exists()) {
+        snap.forEach(s => {
+          const status = s.val();
+          if (status.status === 'approved') {
+            approvedChats.push({
+              adminId: s.key,
+              ...status
+            });
+          } else if (status.status === 'ended') {
+            endedChats.push({
+              adminId: s.key,
+              ...status
+            });
+          }
+        });
+      }
+      renderApprovedChats(approvedChats);
+      renderEndedChats(endedChats);
+    });
+  }
+
+  // Render pending requests
+  function renderChatRequests() {
+    const pendingRequests = chatRequestsCache.filter(r => r.status === 'pending');
+    const container = document.getElementById('pending-requests-list');
+    const emptyMsg = document.getElementById('no-pending-requests');
+    
+    container.innerHTML = '';
+    
+    if (pendingRequests.length === 0) {
+      emptyMsg.classList.remove('hidden');
+      return;
+    }
+    
+    emptyMsg.classList.add('hidden');
+    
+    pendingRequests.forEach(req => {
+      const card = document.createElement('div');
+      card.className = 'chat-request-card';
+      card.innerHTML = `
+        <div class="chat-request-info">
+          <h4>${req.adminEmail || 'Admin'}</h4>
+          <p style="margin: 4px 0; color: var(--muted); font-size: 13px;">${req.message || 'Requesting chat approval'}</p>
+          <p style="margin: 4px 0 0; color: var(--muted); font-size: 12px;">${formatDate(req.requestTime)}</p>
+        </div>
+        <div class="chat-request-actions">
+          <button class="btn small success btn-approve-chat" data-admin-id="${req.adminId}">Approve</button>
+          <button class="btn small danger btn-reject-chat" data-admin-id="${req.adminId}">Reject</button>
+        </div>
+      `;
+      
+      // Attach event listeners
+      card.querySelector('.btn-approve-chat').addEventListener('click', () => approveChatRequest(req.adminId));
+      card.querySelector('.btn-reject-chat').addEventListener('click', () => rejectChatRequest(req.adminId));
+      
+      container.appendChild(card);
+    });
+  }
+
+  // Render approved chats
+  function renderApprovedChats(approvedChats) {
+    const container = document.getElementById('active-chats-list');
+    const emptyMsg = document.getElementById('no-active-chats');
+    
+    container.innerHTML = '';
+    
+    if (approvedChats.length === 0) {
+      emptyMsg.classList.remove('hidden');
+      return;
+    }
+    
+    emptyMsg.classList.add('hidden');
+    
+    // Get admin details for each approved chat
+    approvedChats.forEach(async (chat) => {
+      const adminSnap = await db.ref(`admins/${chat.adminId}`).get();
+      const admin = adminSnap.exists() ? adminSnap.val() : {};
+      
+      const card = document.createElement('div');
+      card.className = 'chat-request-card';
+      card.innerHTML = `
+        <div class="chat-request-info">
+          <h4>${admin.fullName || admin.email || 'Admin'}</h4>
+          <p style="margin: 4px 0; color: var(--muted); font-size: 13px;">${admin.email || ''}</p>
+          <p style="margin: 4px 0 0; color: var(--success); font-size: 12px;">✓ Approved</p>
+        </div>
+        <div class="chat-request-actions">
+          <button class="btn small primary btn-open-chat" data-admin-id="${chat.adminId}" data-admin-name="${admin.fullName || admin.email || 'Admin'}" data-admin-email="${admin.email || ''}">Chat</button>
+          <button class="btn small danger btn-end-chat" data-admin-id="${chat.adminId}" data-admin-name="${admin.fullName || admin.email || 'Admin'}">End Chat</button>
+        </div>
+      `;
+      
+      // Attach event listeners
+      card.querySelector('.btn-open-chat').addEventListener('click', (e) => {
+        const adminId = e.target.getAttribute('data-admin-id');
+        const adminName = e.target.getAttribute('data-admin-name');
+        const adminEmail = e.target.getAttribute('data-admin-email');
+        openChatWindow(adminId, adminName, adminEmail);
+      });
+      
+      card.querySelector('.btn-end-chat').addEventListener('click', (e) => {
+        const adminId = e.target.getAttribute('data-admin-id');
+        const adminName = e.target.getAttribute('data-admin-name');
+        endChatWithAdmin(adminId, adminName);
+      });
+      
+      container.appendChild(card);
+    });
+  }
+
+  // Approve chat request
+  async function approveChatRequest(adminId) {
+    try {
+      // Update chatStatus
+      await db.ref(`chatStatus/${adminId}`).set({
+        status: 'approved',
+        approvedTime: Date.now()
+      });
+      
+      // Update chatRequests
+      await db.ref(`chatRequests/${adminId}`).update({
+        status: 'approved'
+      });
+      
+      // Send welcome message
+      sendMessageToAdmin(adminId, 'Welcome! Your chat has been approved. How can I help you today?');
+      
+      // Show success message
+      alert('Chat request approved successfully! Welcome message sent.');
+      
+    } catch (e) {
+      alert('Failed to approve: ' + e.message);
+    }
+  }
+
+  // Render ended chats
+  function renderEndedChats(endedChats) {
+    const container = document.getElementById('ended-chats-list');
+    const emptyMsg = document.getElementById('no-ended-chats');
+    
+    container.innerHTML = '';
+    
+    if (endedChats.length === 0) {
+      emptyMsg.classList.remove('hidden');
+      return;
+    }
+    
+    emptyMsg.classList.add('hidden');
+    
+    // Get admin details for each ended chat
+    endedChats.forEach(async (chat) => {
+      const adminSnap = await db.ref(`admins/${chat.adminId}`).get();
+      const admin = adminSnap.exists() ? adminSnap.val() : {};
+      
+      const card = document.createElement('div');
+      card.className = 'chat-request-card ended';
+      card.innerHTML = `
+        <div class="chat-request-info">
+          <h4>${admin.fullName || admin.email || 'Admin'}</h4>
+          <p style="margin: 4px 0; color: var(--muted); font-size: 13px;">${admin.email || ''}</p>
+          <p style="margin: 4px 0 0; color: var(--danger); font-size: 12px;">✗ Ended - ${formatDate(chat.endedTime)}</p>
+        </div>
+        <div class="chat-request-actions">
+          <button class="btn small primary btn-view-history" data-admin-id="${chat.adminId}" data-admin-name="${admin.fullName || admin.email || 'Admin'}" data-admin-email="${admin.email || ''}">View History</button>
+        </div>
+      `;
+      
+      // Attach event listener
+      card.querySelector('.btn-view-history').addEventListener('click', (e) => {
+        const adminId = e.target.getAttribute('data-admin-id');
+        const adminName = e.target.getAttribute('data-admin-name');
+        const adminEmail = e.target.getAttribute('data-admin-email');
+        openChatWindow(adminId, adminName, adminEmail, true); // true = read-only
+      });
+      
+      container.appendChild(card);
+    });
+  }
+
+  // Reject chat request
+  async function rejectChatRequest(adminId) {
+    try {
+      // Update chatStatus
+      await db.ref(`chatStatus/${adminId}`).set({
+        status: 'rejected',
+        rejectedTime: Date.now()
+      });
+      
+      // Update chatRequests
+      await db.ref(`chatRequests/${adminId}`).update({
+        status: 'rejected'
+      });
+      
+      // Show success message
+      alert('Chat request rejected successfully.');
+      
+    } catch (e) {
+      alert('Failed to reject: ' + e.message);
+    }
+  }
+
+  // End chat with admin
+  async function endChatWithAdmin(adminId, adminName) {
+    const confirmed = confirm(`End chat with ${adminName}?\n\nThis will close the conversation and they will need to request approval again.`);
+    
+    if (!confirmed) return;
+    
+    try {
+      // Update chatStatus to ended
+      await db.ref(`chatStatus/${adminId}`).set({
+        status: 'ended',
+        endedTime: Date.now()
+      });
+      
+      // Update chatRequests
+      await db.ref(`chatRequests/${adminId}`).update({
+        status: 'ended'
+      });
+      
+      // Close chat window if open
+      if (activeChatAdminId === adminId) {
+        document.getElementById('chat-window-modal').close();
+        stopTyping(adminId);
+        activeChatAdminId = null;
+      }
+      
+      // Show success message
+      alert('Chat ended successfully. The admin will need to request approval again.');
+      
+    } catch (e) {
+      alert('Failed to end chat: ' + e.message);
+    }
+  }
+
+  // Open chat window
+  function openChatWindow(adminId, adminName, adminEmail, readOnly = false) {
+    activeChatAdminId = readOnly ? null : adminId;
+    
+    // Set header info
+    document.getElementById('chat-admin-name').textContent = adminName + (readOnly ? ' (Ended)' : '');
+    document.getElementById('chat-admin-email').textContent = adminEmail;
+    
+    // Clear messages
+    document.getElementById('chat-messages').innerHTML = '';
+    document.getElementById('chat-input').value = '';
+    
+    // Load messages
+    loadMessages(adminId);
+    
+    // Get input container
+    const inputContainer = document.querySelector('.chat-input-container');
+    const typingIndicator = document.getElementById('typing-indicator');
+    
+    // Handle read-only mode
+    if (readOnly) {
+      if (inputContainer) inputContainer.style.display = 'none';
+      if (typingIndicator) typingIndicator.style.display = 'none';
+    } else {
+      if (inputContainer) inputContainer.style.display = 'flex';
+      if (typingIndicator) typingIndicator.style.display = 'block';
+      // Listen for typing
+      listenForAdminTyping(adminId);
+    }
+    
+    // Show modal
+    document.getElementById('chat-window-modal').showModal();
+  }
+
+  // Load messages
+  function loadMessages(adminId) {
+    // Remove previous listener if exists
+    if (messagesListener) {
+      db.ref(`adminChats/${adminId}`).off('child_added', messagesListener);
+    }
+    
+    messagesListener = (snap) => {
+      const message = snap.val();
+      if (message) {
+        displayMessage(message);
+      }
+    };
+    
+    db.ref(`adminChats/${adminId}`).on('child_added', messagesListener);
+  }
+
+  // Display a message in the chat
+  function displayMessage(message) {
+    const container = document.getElementById('chat-messages');
+    const messageDiv = document.createElement('div');
+    const isSuperAdmin = message.senderType === 'superadmin';
+    
+    messageDiv.className = `chat-message ${isSuperAdmin ? 'sent' : 'received'}`;
+    messageDiv.innerHTML = `
+      <div class="message-bubble">
+        <p>${message.message}</p>
+        <span class="message-time">${formatDate(message.timestamp)}</span>
+      </div>
+    `;
+    
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  // Send message
+  async function sendMessageToAdmin(adminId, messageText) {
+    if (!messageText || !messageText.trim()) return;
+    
+    const superAdminId = auth.currentUser?.uid || 'superadmin';
+    
+    const messageData = {
+      senderId: superAdminId,
+      message: messageText.trim(),
+      timestamp: Date.now(),
+      senderType: 'superadmin'
+    };
+    
+    try {
+      await db.ref(`adminChats/${adminId}`).push(messageData);
+      stopTyping(adminId);
+    } catch (e) {
+      alert('Failed to send message: ' + e.message);
+    }
+  }
+
+  // Listen for admin typing
+  function listenForAdminTyping(adminId) {
+    // Remove previous listener
+    if (typingListener) {
+      db.ref(`typing/${adminId}/admin`).off('value', typingListener);
+    }
+    
+    typingListener = (snap) => {
+      const isTyping = snap.val();
+      const indicator = document.getElementById('typing-indicator');
+      
+      if (isTyping === true) {
+        indicator.classList.remove('hidden');
+      } else {
+        indicator.classList.add('hidden');
+      }
+    };
+    
+    db.ref(`typing/${adminId}/admin`).on('value', typingListener);
+  }
+
+  // Start typing indicator
+  function startTyping(adminId) {
+    db.ref(`typing/${adminId}/superadmin`).set(true);
+  }
+
+  // Stop typing indicator
+  function stopTyping(adminId) {
+    db.ref(`typing/${adminId}/superadmin`).set(false);
+  }
+
+  // Chat input event listeners
+  const chatInput = document.getElementById('chat-input');
+  const btnSendMessage = document.getElementById('btn-send-message');
+  const btnCloseChat = document.getElementById('btn-close-chat');
+  
+  chatInput.addEventListener('input', () => {
+    if (!activeChatAdminId) return;
+    
+    startTyping(activeChatAdminId);
+    
+    // Clear previous timeout
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+    
+    // Stop typing after 2 seconds of inactivity
+    typingTimeout = setTimeout(() => {
+      stopTyping(activeChatAdminId);
+    }, 2000);
+  });
+  
+  btnSendMessage.addEventListener('click', () => {
+    if (!activeChatAdminId) return;
+    
+    const message = chatInput.value.trim();
+    if (message) {
+      sendMessageToAdmin(activeChatAdminId, message);
+      chatInput.value = '';
+    }
+  });
+  
+  // Send on Enter (Shift+Enter for new line)
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      btnSendMessage.click();
+    }
+  });
+  
+  btnCloseChat.addEventListener('click', () => {
+    if (activeChatAdminId) {
+      stopTyping(activeChatAdminId);
+      
+      // Remove listeners
+      if (messagesListener) {
+        db.ref(`adminChats/${activeChatAdminId}`).off('child_added', messagesListener);
+      }
+      if (typingListener) {
+        db.ref(`typing/${activeChatAdminId}/admin`).off('value', typingListener);
+      }
+      
+      activeChatAdminId = null;
+    }
+    
+    document.getElementById('chat-window-modal').close();
+  });
 })();
 

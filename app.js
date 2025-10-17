@@ -33,6 +33,7 @@
   const navTabs = document.querySelectorAll('.nav-link');
   const adminsView = document.getElementById('admins-view');
   const complaintsView = document.getElementById('complaints-view');
+  const analyticsView = document.getElementById('analytics-view');
   const breadcrumbText = document.getElementById('breadcrumb-text');
 
   // Admins UI
@@ -57,6 +58,19 @@
   // Admin Details Modal
   const adminDetailsModal = document.getElementById('admin-details-modal');
   const adminModalBody = document.getElementById('admin-modal-body');
+
+  // Analytics UI
+  const analyticsPeriod = document.getElementById('analytics-period');
+  const analyticsTotal = document.getElementById('analytics-total');
+  const analyticsResolutionRate = document.getElementById('analytics-resolution-rate');
+  const analyticsAvgTime = document.getElementById('analytics-avg-time');
+  const analyticsPending = document.getElementById('analytics-pending');
+  const urgentAlert = document.getElementById('urgent-alert');
+  const urgentCount = document.getElementById('urgent-count');
+  const statusChart = document.getElementById('status-chart');
+  const categoryChart = document.getElementById('category-chart');
+  const trendChart = document.getElementById('trend-chart');
+  const priorityChart = document.getElementById('priority-chart');
 
   let adminsCache = [];
   let complaintsCache = [];
@@ -87,12 +101,17 @@
       navTabs.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const tgt = btn.getAttribute('data-target');
-      [adminsView, complaintsView].forEach(v => v.classList.add('hidden'));
+      [adminsView, complaintsView, analyticsView].forEach(v => v.classList.add('hidden'));
       document.getElementById(tgt).classList.remove('hidden');
       
       // Update breadcrumb if present
       const viewName = btn.textContent;
       if (breadcrumbText) breadcrumbText.textContent = viewName;
+      
+      // Load analytics when switching to analytics view
+      if (tgt === 'analytics-view') {
+        renderAnalytics();
+      }
     });
   });
 
@@ -514,6 +533,11 @@
       complaintsCache.sort((a, b) => (b.timestamp || b.createdAt || b.created_on || b.createdOn || 0) - (a.timestamp || a.createdAt || a.created_on || a.createdOn || 0));
 
       renderComplaints();
+      
+      // Update analytics in real-time if analytics view is visible
+      if (!analyticsView.classList.contains('hidden')) {
+        renderAnalytics();
+      }
     };
 
     db.ref(complaintsPath).on('value', complaintsListener);
@@ -618,5 +642,239 @@
     complaintModal.close();
     // No need to reload - real-time listener will update automatically
   });
+
+  // Analytics
+  analyticsPeriod.addEventListener('change', renderAnalytics);
+
+  function getFilteredComplaints() {
+    const period = analyticsPeriod.value;
+    if (period === 'all') return complaintsCache;
+    
+    const days = parseInt(period);
+    const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
+    
+    return complaintsCache.filter(c => {
+      const ts = c.timestamp || c.createdAt || c.created_on || c.createdOn || 0;
+      return ts >= cutoff;
+    });
+  }
+
+  function renderAnalytics() {
+    const filtered = getFilteredComplaints();
+    
+    // Key metrics
+    const total = filtered.length;
+    const resolved = filtered.filter(c => (c.status || '').toLowerCase() === 'resolved').length;
+    const pending = filtered.filter(c => (c.status || '').toLowerCase() === 'pending').length;
+    const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+    
+    analyticsTotal.textContent = total;
+    analyticsResolutionRate.textContent = resolutionRate + '%';
+    analyticsPending.textContent = pending;
+    
+    // Average resolution time
+    const resolvedWithTime = filtered.filter(c => {
+      const status = (c.status || '').toLowerCase();
+      return status === 'resolved' && c.responseTimestamp && (c.timestamp || c.createdAt);
+    });
+    
+    if (resolvedWithTime.length > 0) {
+      const totalTime = resolvedWithTime.reduce((sum, c) => {
+        const created = c.timestamp || c.createdAt || 0;
+        const resolved = c.responseTimestamp || 0;
+        return sum + (resolved - created);
+      }, 0);
+      const avgMs = totalTime / resolvedWithTime.length;
+      const avgHours = Math.round(avgMs / (1000 * 60 * 60));
+      const avgDays = Math.floor(avgHours / 24);
+      const remainingHours = avgHours % 24;
+      
+      if (avgDays > 0) {
+        analyticsAvgTime.textContent = `${avgDays}d ${remainingHours}h`;
+      } else {
+        analyticsAvgTime.textContent = `${avgHours}h`;
+      }
+    } else {
+      analyticsAvgTime.textContent = '-';
+    }
+    
+    // Urgent complaints alert
+    const urgent = filtered.filter(c => {
+      const priority = (c.priority || '').toLowerCase();
+      const status = (c.status || '').toLowerCase();
+      return priority === 'high' && status !== 'resolved';
+    });
+    
+    if (urgent.length > 0) {
+      urgentCount.textContent = urgent.length;
+      urgentAlert.classList.remove('hidden');
+    } else {
+      urgentAlert.classList.add('hidden');
+    }
+    
+    // Status distribution
+    renderStatusChart(filtered);
+    
+    // Category distribution
+    renderCategoryChart(filtered);
+    
+    // Priority distribution
+    renderPriorityChart(filtered);
+    
+    // Trend chart
+    renderTrendChart(filtered);
+  }
+
+  function renderStatusChart(complaints) {
+    const statuses = {};
+    complaints.forEach(c => {
+      const status = c.status || c.state || c.complaintStatus || 'Unknown';
+      statuses[status] = (statuses[status] || 0) + 1;
+    });
+    
+    const max = Math.max(...Object.values(statuses), 1);
+    statusChart.innerHTML = '';
+    
+    const statusColors = {
+      'Pending': 'warning',
+      'In Progress': 'progress',
+      'Resolved': 'success',
+      'Rejected': 'danger'
+    };
+    
+    Object.entries(statuses).sort((a, b) => b[1] - a[1]).forEach(([status, count]) => {
+      const percent = (count / max) * 100;
+      const color = statusColors[status] || 'primary';
+      
+      const item = document.createElement('div');
+      item.className = 'chart-bar-item';
+      item.innerHTML = `
+        <div class="chart-bar-label">${status}</div>
+        <div class="chart-bar-container">
+          <div class="chart-bar-fill ${color}" style="width: ${percent}%"></div>
+        </div>
+        <div class="chart-bar-value">${count}</div>
+      `;
+      statusChart.appendChild(item);
+    });
+  }
+
+  function renderCategoryChart(complaints) {
+    const categories = {};
+    complaints.forEach(c => {
+      const category = c.category || c.type || c.categoryName || 'Uncategorized';
+      categories[category] = (categories[category] || 0) + 1;
+    });
+    
+    const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const max = Math.max(...sorted.map(e => e[1]), 1);
+    categoryChart.innerHTML = '';
+    
+    sorted.forEach(([category, count]) => {
+      const percent = (count / max) * 100;
+      
+      const item = document.createElement('div');
+      item.className = 'chart-bar-item';
+      item.innerHTML = `
+        <div class="chart-bar-label">${category}</div>
+        <div class="chart-bar-container">
+          <div class="chart-bar-fill primary" style="width: ${percent}%"></div>
+        </div>
+        <div class="chart-bar-value">${count}</div>
+      `;
+      categoryChart.appendChild(item);
+    });
+    
+    if (sorted.length === 0) {
+      categoryChart.innerHTML = '<div class="empty">No data available</div>';
+    }
+  }
+
+  function renderPriorityChart(complaints) {
+    const priorities = {};
+    complaints.forEach(c => {
+      const priority = c.priority || c.level || 'Medium';
+      priorities[priority] = (priorities[priority] || 0) + 1;
+    });
+    
+    const max = Math.max(...Object.values(priorities), 1);
+    priorityChart.innerHTML = '';
+    
+    const priorityColors = {
+      'High': 'danger',
+      'Medium': 'warning',
+      'Low': 'success'
+    };
+    
+    const order = ['High', 'Medium', 'Low'];
+    order.forEach(priority => {
+      const count = priorities[priority] || 0;
+      const percent = (count / max) * 100;
+      const color = priorityColors[priority] || 'primary';
+      
+      const item = document.createElement('div');
+      item.className = 'chart-bar-item';
+      item.innerHTML = `
+        <div class="chart-bar-label">${priority}</div>
+        <div class="chart-bar-container">
+          <div class="chart-bar-fill ${color}" style="width: ${percent}%"></div>
+        </div>
+        <div class="chart-bar-value">${count}</div>
+      `;
+      priorityChart.appendChild(item);
+    });
+  }
+
+  function renderTrendChart(complaints) {
+    trendChart.innerHTML = '';
+    
+    if (complaints.length === 0) {
+      trendChart.innerHTML = '<div class="trend-empty">No data available</div>';
+      return;
+    }
+    
+    // Group by date
+    const period = analyticsPeriod.value;
+    const days = period === 'all' ? 30 : parseInt(period);
+    const dates = {};
+    
+    // Initialize dates
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const key = date.toISOString().split('T')[0];
+      dates[key] = 0;
+    }
+    
+    // Count complaints per date
+    complaints.forEach(c => {
+      const ts = c.timestamp || c.createdAt || c.created_on || c.createdOn;
+      if (ts) {
+        const date = new Date(ts);
+        const key = date.toISOString().split('T')[0];
+        if (dates.hasOwnProperty(key)) {
+          dates[key]++;
+        }
+      }
+    });
+    
+    const values = Object.values(dates);
+    const max = Math.max(...values, 1);
+    
+    // Render bars
+    Object.entries(dates).forEach(([date, count]) => {
+      const height = (count / max) * 100;
+      const label = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      const bar = document.createElement('div');
+      bar.className = 'trend-bar';
+      bar.style.height = height + '%';
+      bar.innerHTML = `
+        <div class="trend-bar-tooltip">${count} complaints</div>
+        <div class="trend-bar-label">${label}</div>
+      `;
+      trendChart.appendChild(bar);
+    });
+  }
 })();
 

@@ -124,3 +124,44 @@ dialog { border: none; border-radius: 12px; padding: 0; background: transparent;
 
 /* Actions group */
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Analytics Dashboard */
+.analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0; }
+.pending-stat { color: var(--warning) !important; }
+
+/* Urgent Alert */
+.urgent-alert { 
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin: 14px 0;
+  background: rgba(239, 68, 68, .1); border: 1px solid var(--danger); border-radius: 12px;
+  color: var(--danger);
+}
+.urgent-alert svg { flex-shrink: 0; }
+.urgent-alert strong { display: block; font-size: 14px; }
+
+/* Charts Container */
+.charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 14px 0; }
+.chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.chart-card.full-width { grid-column: 1 / -1; }
+.chart-card h3 { margin: 0 0 14px; font-size: 16px; color: var(--muted); }
+
+/* Bar Charts */
+.chart-bars { display: flex; flex-direction: column; gap: 10px; }
+.chart-bar-item { display: flex; align-items: center; gap: 10px; }
+.chart-bar-label { min-width: 100px; font-size: 13px; color: var(--muted); }
+.chart-bar-container { flex: 1; height: 24px; background: #0b1220; border-radius: 6px; overflow: hidden; position: relative; }
+.chart-bar-fill { height: 100%; transition: width 0.3s ease; border-radius: 6px; }
+.chart-bar-fill.primary { background: var(--primary); }
+.chart-bar-fill.success { background: var(--success); }
+.chart-bar-fill.warning { background: var(--warning); }
+.chart-bar-fill.danger { background: var(--danger); }
+.chart-bar-fill.progress { background: #3b82f6; }
+.chart-bar-value { min-width: 40px; text-align: right; font-size: 13px; font-weight: 600; }
+
+/* Trend Chart */
+.trend-chart { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; height: 200px; padding: 10px 0; }
+.trend-bar { flex: 1; background: var(--primary); border-radius: 4px 4px 0 0; min-height: 4px; position: relative; cursor: pointer; transition: all 0.2s; }
+.trend-bar:hover { background: var(--primary-700); transform: scaleY(1.05); }
+.trend-bar-label { position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.trend-bar-tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 8px; padding: 4px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.trend-bar:hover .trend-bar-tooltip { opacity: 1; }
+.trend-empty { text-align: center; color: var(--muted); padding: 60px 0; }

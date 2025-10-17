@@ -96,6 +96,16 @@
             </svg>
             <span>Complaints</span>
           </button>
+             <button class="nav-link" data-target="analytics-view">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span>Analytics</span>
+          </button>
         </nav>
         <div class="spacer"></div>
         <div id="current-user" class="user"></div>
@@ -216,6 +226,84 @@
                 </menu>
               </form>
             </dialog>
+          </section>
+
+          <!-- Analytics View -->
+          <section id="analytics-view" class="view hidden">
+            <h2>Analytics</h2>
+            
+            <!-- Time Period Filter -->
+            <div class="toolbar">
+              <div class="form-group inline">
+                <label for="analytics-period">Time Period</label>
+                <select id="analytics-period">
+                  <option value="7">Last 7 Days</option>
+                  <option value="30" selected>Last 30 Days</option>
+                  <option value="90">Last 90 Days</option>
+                  <option value="all">All Time</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Urgent Complaints Alert -->
+            <div id="urgent-alert" class="urgent-alert hidden">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <div>
+                <strong>Urgent Complaints</strong>
+                <span id="urgent-count">0</span> high priority complaints need attention
+              </div>
+            </div>
+
+            <!-- Key Metrics -->
+            <div class="analytics-grid">
+              <div class="stat-card">
+                <div class="stat-title">Total Complaints</div>
+                <div id="analytics-total" class="stat-value">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Resolution Rate</div>
+                <div id="analytics-resolution-rate" class="stat-value">0%</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Avg Resolution Time</div>
+                <div id="analytics-avg-time" class="stat-value">-</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Pending</div>
+                <div id="analytics-pending" class="stat-value pending-stat">0</div>
+              </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="charts-container">
+              <!-- Status Distribution -->
+              <div class="chart-card">
+                <h3>Status Distribution</h3>
+                <div id="status-chart" class="chart-bars"></div>
+              </div>
+
+              <!-- Category Distribution -->
+              <div class="chart-card">
+                <h3>Most Common Categories</h3>
+                <div id="category-chart" class="chart-bars"></div>
+              </div>
+            </div>
+
+            <!-- Trend Chart -->
+            <div class="chart-card full-width">
+              <h3>Daily Complaint Trends</h3>
+              <div id="trend-chart" class="trend-chart"></div>
+            </div>
+
+            <!-- Priority Distribution -->
+            <div class="chart-card">
+              <h3>Priority Distribution</h3>
+              <div id="priority-chart" class="chart-bars"></div>
+            </div>
           </section>
 
           <!-- Modal for viewing admin details -->

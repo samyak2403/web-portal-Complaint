@@ -47,6 +47,7 @@
   const adminsPending = document.getElementById('admins-pending');
   const adminsApproved = document.getElementById('admins-approved');
   const adminsRejected = document.getElementById('admins-rejected');
+  const adminsDeactivate = document.getElementById('admins-deactivate');
 
   // Complaints UI
   const complaintStatusFilter = document.getElementById('complaint-status-filter');
@@ -284,25 +285,47 @@
   function adminMatchesFilter(a) {
     const status = adminStatusFilter.value;
     const q = (adminSearch.value || '').toLowerCase();
-    const matchesStatus = status === 'All' || (a.status === status);
+    
+    let matchesStatus;
+    if (status === 'All') {
+      matchesStatus = true;
+    } else if (status === 'Deactivate') {
+      matchesStatus = a.isActive !== true;
+    } else {
+      matchesStatus = a.status === status;
+    }
+    
     const text = `${a.fullName || ''} ${a.email || ''} ${a.collegeName || ''} ${a.department || ''}`.toLowerCase();
     const matchesQuery = !q || text.includes(q);
     return matchesStatus && matchesQuery;
   }
 
   function renderAdmins() {
+    const filtered = adminsCache.filter(adminMatchesFilter);
+    adminsTbody.innerHTML = '';
+
     const total = adminsCache.length;
     const pending = adminsCache.filter(a => a.status === 'Pending').length;
     const approved = adminsCache.filter(a => a.status === 'Approved').length;
     const rejected = adminsCache.filter(a => a.status === 'Rejected').length;
+    const deactivated = adminsCache.filter(a => a.isActive !== true).length;
 
     adminsTotal.textContent = total;
     adminsPending.textContent = pending;
     adminsApproved.textContent = approved;
     adminsRejected.textContent = rejected;
+    adminsDeactivate.textContent = deactivated;
 
-    const filtered = adminsCache.filter(adminMatchesFilter);
-    adminsTbody.innerHTML = '';
+    // Update admins badge
+    const adminsBadge = document.getElementById('admins-badge');
+    if (adminsBadge) {
+      if (pending > 0) {
+        adminsBadge.textContent = pending > 99 ? '99+' : pending;
+        adminsBadge.classList.remove('hidden');
+      } else {
+        adminsBadge.classList.add('hidden');
+      }
+    }
 
     filtered.forEach(a => {
       const tr = document.createElement('tr');
@@ -496,6 +519,10 @@
     adminStatusFilter.value = 'Rejected';
     renderAdmins();
   });
+  document.getElementById('admins-deactivate').parentElement.addEventListener('click', () => {
+    adminStatusFilter.value = 'Deactivate';
+    renderAdmins();
+  });
   document.getElementById('admins-total').parentElement.addEventListener('click', () => {
     adminStatusFilter.value = 'All';
     renderAdmins();
@@ -574,6 +601,22 @@
     const filtered = complaintsCache.filter(complaintMatchesFilter);
     complaintsTbody.innerHTML = '';
 
+    // Update complaints badge
+    const complaintsBadge = document.getElementById('complaints-badge');
+    if (complaintsBadge) {
+      const pendingCount = complaintsCache.filter(c => {
+        const status = (c.status || c.state || c.complaintStatus || '').toLowerCase();
+        return status === 'pending';
+      }).length;
+      
+      if (pendingCount > 0) {
+        complaintsBadge.textContent = pendingCount > 99 ? '99+' : pendingCount;
+        complaintsBadge.classList.remove('hidden');
+      } else {
+        complaintsBadge.classList.add('hidden');
+      }
+    }
+
     filtered.forEach(c => {
       const title = c.title || c.problem || c.subject || '-';
       const category = c.category || c.type || c.categoryName || '-';
@@ -591,7 +634,13 @@
         <td>${formatDate(ts)}</td>
         <td>${anon}</td>
         <td>
-          <button class="btn small primary btn-edit-complaint">Update</button>
+          <button class="btn small primary btn-edit-complaint" style="display:inline-flex;align-items:center;gap:6px" title="Edit/Update">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>
+            </svg>
+            <span>Update</span>
+          </button>
         </td>
       `;
       tr.querySelector('.btn-edit-complaint').addEventListener('click', () => openComplaintModal(c));
@@ -675,6 +724,27 @@
     });
     complaintModal.close();
     // No need to reload - real-time listener will update automatically
+  });
+
+  // Delete complaint handler
+  const modalDelete = document.getElementById('modal-delete');
+  modalDelete.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (!selectedComplaint) return;
+    
+    const title = selectedComplaint.title || selectedComplaint.problem || selectedComplaint.subject || 'this complaint';
+    const confirmed = confirm(`Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`);
+    
+    if (!confirmed) return;
+    
+    try {
+      // Delete from Firebase
+      await db.ref(`${complaintsPath}/${selectedComplaint.id}`).remove();
+      complaintModal.close();
+      // Real-time listener will update the UI automatically
+    } catch (error) {
+      alert('Failed to delete complaint: ' + error.message);
+    }
   });
 
   // Analytics
@@ -1009,6 +1079,8 @@
   let messagesListener = null;
   let typingListener = null;
   let typingTimeout = null;
+  let autoReplyEnabled = false;
+  let lastMessageTimestamp = 0;
 
   // Load chat requests and approved chats
   function loadChatRequests() {
@@ -1055,8 +1127,19 @@
     const pendingRequests = chatRequestsCache.filter(r => r.status === 'pending');
     const container = document.getElementById('pending-requests-list');
     const emptyMsg = document.getElementById('no-pending-requests');
+    const chatBadge = document.getElementById('chat-badge');
     
     container.innerHTML = '';
+    
+    // Update badge
+    if (chatBadge) {
+      if (pendingRequests.length > 0) {
+        chatBadge.textContent = pendingRequests.length > 99 ? '99+' : pendingRequests.length;
+        chatBadge.classList.remove('hidden');
+      } else {
+        chatBadge.classList.add('hidden');
+      }
+    }
     
     if (pendingRequests.length === 0) {
       emptyMsg.classList.remove('hidden');
@@ -1330,6 +1413,11 @@
     
     container.appendChild(messageDiv);
     container.scrollTop = container.scrollHeight;
+    
+    // Trigger auto-reply for incoming admin messages
+    if (!isSuperAdmin) {
+      handleAutoReply(message);
+    }
   }
 
   // Send message
@@ -1382,6 +1470,322 @@
   // Stop typing indicator
   function stopTyping(adminId) {
     db.ref(`typing/${adminId}/superadmin`).set(false);
+  }
+
+  // ========================================
+  // ML-BASED AUTO-REPLY SYSTEM
+  // ========================================
+  
+  // Machine Learning Problem Detection Engine
+  const mlEngine = {
+    // Knowledge base for problem detection
+    problemPatterns: [
+      {
+        category: 'Technical Issue',
+        keywords: ['not working', 'error', 'bug', 'crash', 'broken', 'fails', 'issue', 'problem', 'doesn\'t work', 'cant', 'cannot'],
+        responses: [
+          'I\'ve detected a technical issue. Our team is looking into this. Can you provide more details about when this started?',
+          'Thank you for reporting this technical problem. Could you share any error messages you\'re seeing?',
+          'I understand you\'re experiencing technical difficulties. Let me help - what specific feature is causing the issue?'
+        ]
+      },
+      {
+        category: 'Access/Permission',
+        keywords: ['access', 'permission', 'login', 'password', 'locked out', 'cant login', 'sign in', 'authentication', 'unauthorized'],
+        responses: [
+          'I see you\'re having access issues. Let me verify your permissions. What specific area are you trying to access?',
+          'Access problems detected. I can help with that. Have you tried resetting your password?',
+          'I\'ve identified a login/access concern. Our team will prioritize this. When did you first notice this issue?'
+        ]
+      },
+      {
+        category: 'Data/Information',
+        keywords: ['data', 'information', 'missing', 'lost', 'where is', 'find', 'show me', 'display', 'report', 'export'],
+        responses: [
+          'I\'ve detected you\'re looking for specific data. Which section or report do you need?',
+          'Information request identified. I can help you locate that. What specific data are you looking for?',
+          'I understand you need to access certain information. Let me guide you - what are you trying to find?'
+        ]
+      },
+      {
+        category: 'Feature Request',
+        keywords: ['add', 'feature', 'want', 'need', 'would like', 'suggestion', 'improve', 'enhance', 'new'],
+        responses: [
+          'Great suggestion! I\'ve noted your feature request. Can you elaborate on how this would help your workflow?',
+          'Thank you for the feature idea! Our team values user feedback. Could you provide more context on this enhancement?',
+          'I\'ve detected a feature request. This is valuable input. What problem would this solve for you?'
+        ]
+      },
+      {
+        category: 'Performance Issue',
+        keywords: ['slow', 'loading', 'performance', 'lag', 'freeze', 'hang', 'timeout', 'takes long', 'delayed'],
+        responses: [
+          'I\'ve detected performance concerns. Slow systems are frustrating - can you tell me which section is affected?',
+          'Performance issue identified. Let me help investigate. When did you notice the slowdown?',
+          'I understand things are running slowly. Our team will look into this. Which specific operation is lagging?'
+        ]
+      },
+      {
+        category: 'Help/How-to',
+        keywords: ['how', 'help', 'guide', 'tutorial', 'instructions', 'teach', 'show', 'explain', 'what is', 'how do i'],
+        responses: [
+          'I\'m here to help! What would you like to learn more about?',
+          'I can guide you through this. What specific task do you need help with?',
+          'Happy to assist! Let me know what you\'re trying to accomplish.'
+        ]
+      },
+      {
+        category: 'Urgent Issue',
+        keywords: ['urgent', 'emergency', 'critical', 'immediately', 'asap', 'now', 'important', 'priority'],
+        responses: [
+          '🚨 I\'ve detected this is urgent. Our team will prioritize your request. Please share all critical details.',
+          'Urgent issue flagged. We\'re treating this as high priority. What immediate action do you need?',
+          'I understand this is time-sensitive. Our team is being alerted now. What\'s the critical issue?'
+        ]
+      },
+      {
+        category: 'Rejection/Approval Inquiry',
+        keywords: ['rejection reason', 'why rejected', 'denied', 'not approved', 'clarification', 'specific issues', 'rejected', 'approval', 'disapproved', 'decline', 'why was i', 'need clarification', 'what issues', 'address'],
+        responses: [
+          'I understand you need clarification on the rejection. Let me review the specific reasons provided and get back to you with details.',
+          'Thank you for reaching out about the rejection. I can see there are concerns that need addressing. Let me pull up the details for you.',
+          'I see you\'re asking about rejection reasons. I\'ll help clarify the specific issues that need to be resolved. Give me a moment to gather that information.',
+          'I appreciate you asking for clarification. Let me review your case and provide you with the specific feedback regarding the rejection.',
+          'Thank you for following up. I\'ll look into the rejection details and explain what needs to be addressed for approval.'
+        ]
+      },
+      {
+        category: 'Question',
+        keywords: ['?', 'why', 'when', 'what', 'where', 'who', 'which'],
+        responses: [
+          'Great question! Let me help you with that. Could you provide more context?',
+          'I\'ll do my best to answer. Can you clarify what specific information you need?',
+          'I\'m here to help answer your questions. What would you like to know more about?'
+        ]
+      }
+    ],
+    
+    // Advanced problem detection with context analysis
+    analyzeProblem(message) {
+      const text = message.toLowerCase();
+      const words = text.split(/\s+/);
+      const messageLength = words.length;
+      
+      let bestMatch = null;
+      let maxScore = 0;
+      let categoryScores = [];
+      
+      // Detect urgency indicators
+      const isUrgent = /urgent|emergency|critical|asap|immediately|now/i.test(message);
+      const hasQuestion = message.includes('?');
+      const isPolite = /please|kindly|thank|appreciate/i.test(message);
+      
+      // Score each category with advanced weighting
+      for (const pattern of this.problemPatterns) {
+        let score = 0;
+        let matchedKeywords = [];
+        
+        for (const keyword of pattern.keywords) {
+          const keywordLower = keyword.toLowerCase();
+          
+          if (text.includes(keywordLower)) {
+            // Base score for match
+            let keywordScore = 1;
+            
+            // Multi-word phrases get higher weight
+            const wordCount = keyword.split(' ').length;
+            if (wordCount > 1) {
+              keywordScore += wordCount * 0.8;
+            }
+            
+            // Boost score if keyword appears at start (indicates main topic)
+            if (text.indexOf(keywordLower) < 20) {
+              keywordScore *= 1.3;
+            }
+            
+            // Count multiple occurrences
+            const occurrences = (text.match(new RegExp(keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+            keywordScore *= (1 + (occurrences - 1) * 0.2);
+            
+            score += keywordScore;
+            matchedKeywords.push(keyword);
+          }
+        }
+        
+        // Apply category-specific modifiers
+        if (pattern.category === 'Urgent Issue' && isUrgent) {
+          score *= 2.5; // Heavily prioritize urgent category when urgent words detected
+        }
+        
+        if (pattern.category === 'Question' && hasQuestion) {
+          score *= 1.5;
+        }
+        
+        if (pattern.category === 'Rejection/Approval Inquiry' && /rejection|rejected|denied|approval/i.test(message)) {
+          score *= 1.8; // Boost rejection-specific matches
+        }
+        
+        // Penalize generic categories for short messages
+        if (pattern.category === 'Question' && messageLength < 5) {
+          score *= 0.7;
+        }
+        
+        categoryScores.push({
+          pattern,
+          score,
+          matchedKeywords,
+          matchCount: matchedKeywords.length
+        });
+        
+        if (score > maxScore) {
+          maxScore = score;
+          bestMatch = { pattern, matchedKeywords, score };
+        }
+      }
+      
+      // Require minimum confidence threshold
+      if (maxScore >= 1) {
+        // Select best response based on context
+        const responses = bestMatch.pattern.responses;
+        let selectedResponse;
+        
+        // For urgent issues, prefer responses with urgency acknowledgment
+        if (isUrgent && bestMatch.pattern.category === 'Urgent Issue') {
+          selectedResponse = responses[0]; // Use first (most urgent) response
+        } else if (isPolite && responses.length > 1) {
+          selectedResponse = responses[responses.length - 1]; // Use last (often more polite) response
+        } else {
+          // Smart selection: vary responses but prefer higher-quality ones
+          const index = Math.floor(Math.random() * responses.length);
+          selectedResponse = responses[index];
+        }
+        
+      // Calculate normalized confidence
+        const confidence = Math.min((maxScore / 5) * 0.9, 0.95); // Cap at 95%
+        
+        return {
+          category: bestMatch.pattern.category,
+          response: selectedResponse,
+          confidence: confidence,
+          matchedKeywords: bestMatch.matchedKeywords.slice(0, 3), // Top 3 matched keywords
+          isUrgent: isUrgent,
+          hasQuestion: hasQuestion
+        };
+      }
+      
+      // Enhanced fallback responses based on message characteristics
+      let fallbackResponse;
+      
+      if (isUrgent) {
+        fallbackResponse = 'I see this is urgent. Let me help you right away. Please provide more details about the issue you\'re facing.';
+      } else if (hasQuestion) {
+        fallbackResponse = 'Great question! I\'m here to help. Could you provide a bit more context so I can give you the best answer?';
+      } else if (messageLength < 3) {
+        fallbackResponse = 'Hi! I\'m here to assist you. Could you please elaborate on what you need help with?';
+      } else if (isPolite) {
+        fallbackResponse = 'Thank you for reaching out! I appreciate your message. Let me know more details and I\'ll be happy to help.';
+      } else {
+        fallbackResponse = 'Thank you for your message. I\'m here to help. Could you provide more details about what you need?';
+      }
+      
+      return {
+        category: 'General',
+        response: fallbackResponse,
+        confidence: 0.4,
+        matchedKeywords: [],
+        isUrgent: isUrgent,
+        hasQuestion: hasQuestion
+      };
+    }
+  };
+  
+  // Auto-reply button handler
+  const btnAutoReply = document.getElementById('btn-auto-reply');
+  const autoReplyText = document.getElementById('auto-reply-text');
+  const autoReplyIndicator = document.getElementById('auto-reply-indicator');
+  const autoReplyCategory = document.getElementById('auto-reply-category');
+  
+  if (btnAutoReply) {
+    btnAutoReply.addEventListener('click', () => {
+      autoReplyEnabled = !autoReplyEnabled;
+      
+      if (autoReplyEnabled) {
+        btnAutoReply.style.background = '#ef4444';
+        autoReplyText.textContent = 'Auto-Reply ON';
+        showNotification('🤖 Auto-Reply Enabled - AI will respond to incoming messages', 'success');
+      } else {
+        btnAutoReply.style.background = '#10b981';
+        autoReplyText.textContent = 'Auto-Reply OFF';
+        autoReplyIndicator.classList.add('hidden');
+        showNotification('Auto-Reply Disabled', 'info');
+      }
+    });
+  }
+  
+  // Show notification helper
+  function showNotification(message, type = 'info') {
+    const colors = {
+      success: '#10b981',
+      info: '#3b82f6',
+      warning: '#f59e0b',
+      error: '#ef4444'
+    };
+    
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      background: ${colors[type] || colors.info};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 10000;
+      font-size: 14px;
+      max-width: 300px;
+      animation: slideIn 0.3s ease-out;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.style.animation = 'slideOut 0.3s ease-in';
+      setTimeout(() => document.body.removeChild(notification), 300);
+    }, 3000);
+  }
+  
+  // Handle auto-reply logic
+  async function handleAutoReply(message) {
+    if (!autoReplyEnabled || !activeChatAdminId) return;
+    if (message.senderType === 'superadmin') return; // Don't reply to our own messages
+    
+    // Prevent duplicate replies to the same message
+    const messageTime = message.timestamp || Date.now();
+    if (messageTime <= lastMessageTimestamp) return;
+    lastMessageTimestamp = messageTime;
+    
+    // Use keyword-based detection
+    const analysis = mlEngine.analyzeProblem(message.message);
+    const finalResponse = analysis.response;
+    const categoryLabel = analysis.category;
+    console.log(`Keyword-based response: [${analysis.category}] Confidence: ${(analysis.confidence * 100).toFixed(0)}%`);
+    
+    // Show what was detected
+    autoReplyCategory.textContent = categoryLabel;
+    autoReplyIndicator.classList.remove('hidden');
+    
+    // Hide indicator after 3 seconds
+    setTimeout(() => {
+      autoReplyIndicator.classList.add('hidden');
+    }, 3000);
+    
+    // Send auto-reply with slight delay (more natural)
+    setTimeout(() => {
+      if (autoReplyEnabled && activeChatAdminId) {
+        sendMessageToAdmin(activeChatAdminId, finalResponse);
+      }
+    }, 1500);
   }
 
   // Chat input event listeners
@@ -1440,5 +1844,303 @@
     
     document.getElementById('chat-window-modal').close();
   });
+
+  // ========================================
+  // EXPORT & REPORTING FUNCTIONALITY
+  // ========================================
+
+  const btnExportCSV = document.getElementById('btn-export-csv');
+  const btnExportPDF = document.getElementById('btn-export-pdf');
+  const btnShareDashboard = document.getElementById('btn-share-dashboard');
+
+  // Helper function to get filtered complaints for export
+  function getExportData() {
+    const filtered = complaintsCache.filter(complaintMatchesFilter);
+    return filtered.map(c => ({
+      id: c.id || '-',
+      title: c.title || c.problem || c.subject || '-',
+      category: c.category || c.type || c.categoryName || '-',
+      status: c.status || c.state || c.complaintStatus || '-',
+      priority: c.priority || c.level || 'Medium',
+      description: c.description || c.details || '-',
+      anonymousId: c.anonymousId || c.anonId || c.userId || '-',
+      submittedDate: formatDate(c.timestamp || c.createdAt || c.created_on || c.createdOn),
+      submittedTimestamp: c.timestamp || c.createdAt || c.created_on || c.createdOn || 0,
+      adminResponse: c.adminResponse || c.response || '-',
+      responseDate: c.responseTimestamp ? formatDate(c.responseTimestamp) : '-',
+      responseTimestamp: c.responseTimestamp || 0
+    }));
+  }
+
+  // Export to CSV
+  function exportToCSV() {
+    const data = getExportData();
+    
+    if (data.length === 0) {
+      alert('No complaints to export. Please adjust your filters.');
+      return;
+    }
+
+    // Create CSV content
+    const headers = ['ID', 'Title', 'Category', 'Status', 'Priority', 'Description', 'Anonymous ID', 'Submitted Date', 'Admin Response', 'Response Date'];
+    let csv = headers.join(',') + '\n';
+
+    data.forEach(row => {
+      const values = [
+        escapeCSV(row.id),
+        escapeCSV(row.title),
+        escapeCSV(row.category),
+        escapeCSV(row.status),
+        escapeCSV(row.priority),
+        escapeCSV(row.description),
+        escapeCSV(row.anonymousId),
+        escapeCSV(row.submittedDate),
+        escapeCSV(row.adminResponse),
+        escapeCSV(row.responseDate)
+      ];
+      csv += values.join(',') + '\n';
+    });
+
+    // Download CSV
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `complaints_export_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    alert(`✅ Successfully exported ${data.length} complaints to CSV!`);
+  }
+
+  function escapeCSV(value) {
+    if (value === null || value === undefined) return '""';
+    const str = String(value).replace(/"/g, '""');
+    return `"${str}"`;
+  }
+
+  // Export to PDF Report
+  async function exportToPDF() {
+    const data = getExportData();
+    
+    if (data.length === 0) {
+      alert('No complaints to export. Please adjust your filters.');
+      return;
+    }
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      
+      // Add title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Complaints Report', 14, 20);
+      
+      // Add metadata
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+      doc.text(`Total Complaints: ${data.length}`, 14, 34);
+      
+      // Calculate statistics
+      const statusCounts = {};
+      const priorityCounts = {};
+      data.forEach(c => {
+        statusCounts[c.status] = (statusCounts[c.status] || 0) + 1;
+        priorityCounts[c.priority] = (priorityCounts[c.priority] || 0) + 1;
+      });
+      
+      // Add summary section
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Summary Statistics', 14, 44);
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 50;
+      
+      doc.text('Status Distribution:', 14, yPos);
+      yPos += 6;
+      Object.entries(statusCounts).forEach(([status, count]) => {
+        doc.text(`  • ${status}: ${count} (${Math.round(count/data.length*100)}%)`, 14, yPos);
+        yPos += 5;
+      });
+      
+      yPos += 3;
+      doc.text('Priority Distribution:', 14, yPos);
+      yPos += 6;
+      Object.entries(priorityCounts).forEach(([priority, count]) => {
+        doc.text(`  • ${priority}: ${count} (${Math.round(count/data.length*100)}%)`, 14, yPos);
+        yPos += 5;
+      });
+      
+      // Add complaints table
+      doc.addPage();
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Detailed Complaints List', 14, 20);
+      
+      // Create table data
+      const tableData = data.map(c => [
+        c.title.substring(0, 30) + (c.title.length > 30 ? '...' : ''),
+        c.category,
+        c.status,
+        c.priority,
+        c.submittedDate
+      ]);
+      
+      doc.autoTable({
+        startY: 28,
+        head: [['Title', 'Category', 'Status', 'Priority', 'Submitted']],
+        body: tableData,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [66, 135, 245], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: {
+          0: { cellWidth: 60 },
+          1: { cellWidth: 35 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 35 }
+        }
+      });
+      
+      // Save PDF
+      doc.save(`complaints_report_${Date.now()}.pdf`);
+      alert(`✅ Successfully generated PDF report with ${data.length} complaints!`);
+    } catch (e) {
+      console.error('PDF generation error:', e);
+      alert('❌ Error generating PDF: ' + e.message);
+    }
+  }
+
+  // Generate Shareable Dashboard Link
+  function generateShareableDashboard() {
+    // Get current filters
+    const statusFilter = complaintStatusFilter.value;
+    const searchQuery = complaintSearch.value;
+    
+    // Create URL parameters
+    const params = new URLSearchParams();
+    if (statusFilter !== 'All') params.set('status', statusFilter);
+    if (searchQuery) params.set('search', searchQuery);
+    params.set('view', 'analytics');
+    params.set('shared', 'true');
+    
+    // Generate shareable URL
+    const baseUrl = window.location.origin + window.location.pathname;
+    const shareUrl = `${baseUrl}?${params.toString()}`;
+    
+    // Create modal content
+    const modalHtml = `
+      <div style="padding: 20px;">
+        <h3 style="margin-top: 0;">📈 Shareable Dashboard Link</h3>
+        <p style="color: #666; margin-bottom: 16px;">Share this link to provide read-only access to the analytics dashboard with current filters applied:</p>
+        
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin-bottom: 16px; word-break: break-all; font-family: monospace; font-size: 12px;">
+          ${shareUrl}
+        </div>
+        
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <button id="copy-share-link" class="btn primary" style="flex: 1;">📋 Copy Link</button>
+          <button id="open-share-link" class="btn" style="flex: 1;">🔗 Open in New Tab</button>
+        </div>
+        
+        <div style="background: #fff3cd; padding: 12px; border-radius: 6px; border: 1px solid #ffc107;">
+          <p style="margin: 0; font-size: 13px; color: #856404;">
+            <strong>Note:</strong> Recipients will still need to be logged in to view the dashboard. This link pre-applies your current filters.
+          </p>
+        </div>
+        
+        <button id="close-share-modal" class="btn" style="margin-top: 16px; width: 100%;">Close</button>
+      </div>
+    `;
+    
+    // Show modal
+    const modal = document.createElement('dialog');
+    modal.innerHTML = modalHtml;
+    modal.style.maxWidth = '600px';
+    modal.style.border = 'none';
+    modal.style.borderRadius = '12px';
+    modal.style.padding = '0';
+    modal.style.boxShadow = '0 4px 24px rgba(0,0,0,0.15)';
+    document.body.appendChild(modal);
+    modal.showModal();
+    
+    // Add event listeners
+    modal.querySelector('#copy-share-link').addEventListener('click', () => {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert('✅ Link copied to clipboard!');
+      }).catch(() => {
+        alert('❌ Failed to copy link. Please copy manually.');
+      });
+    });
+    
+    modal.querySelector('#open-share-link').addEventListener('click', () => {
+      window.open(shareUrl, '_blank');
+    });
+    
+    modal.querySelector('#close-share-modal').addEventListener('click', () => {
+      modal.close();
+      document.body.removeChild(modal);
+    });
+    
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.close();
+        document.body.removeChild(modal);
+      }
+    });
+  }
+
+  // Attach event listeners for export buttons
+  if (btnExportCSV) {
+    btnExportCSV.addEventListener('click', exportToCSV);
+  }
+  
+  if (btnExportPDF) {
+    btnExportPDF.addEventListener('click', exportToPDF);
+  }
+  
+  if (btnShareDashboard) {
+    btnShareDashboard.addEventListener('click', generateShareableDashboard);
+  }
+
+  // Handle URL parameters for shared dashboard
+  function handleSharedDashboard() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isShared = urlParams.get('shared');
+    
+    if (isShared === 'true') {
+      // Apply filters from URL
+      const status = urlParams.get('status');
+      const search = urlParams.get('search');
+      const view = urlParams.get('view');
+      
+      if (status && complaintStatusFilter) {
+        complaintStatusFilter.value = status;
+      }
+      
+      if (search && complaintSearch) {
+        complaintSearch.value = search;
+      }
+      
+      // Switch to analytics view if specified
+      if (view === 'analytics') {
+        setTimeout(() => {
+          const analyticsButton = document.querySelector('[data-target="analytics-view"]');
+          if (analyticsButton) analyticsButton.click();
+        }, 1000);
+      }
+    }
+  }
+  
+  // Initialize shared dashboard handling
+  handleSharedDashboard();
 })();
 

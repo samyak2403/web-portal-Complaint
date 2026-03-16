@@ -30,6 +30,10 @@
   const showRegisterLink = document.getElementById('show-register');
   const showLoginLink = document.getElementById('show-login');
 
+  const themeToggle = document.getElementById('theme-toggle');
+  const themeIconLight = document.getElementById('theme-icon-light');
+  const themeIconDark = document.getElementById('theme-icon-dark');
+
   const navTabs = document.querySelectorAll('.nav-link');
   const adminsView = document.getElementById('admins-view');
   const complaintsView = document.getElementById('complaints-view');
@@ -82,6 +86,34 @@
 
   function show(el) { el.classList.remove('hidden'); }
   function hide(el) { el.classList.add('hidden'); }
+
+  // Theme Logic
+  function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    applyTheme(savedTheme);
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    
+    if (theme === 'dark') {
+      show(themeIconLight);
+      hide(themeIconDark);
+    } else {
+      hide(themeIconLight);
+      show(themeIconDark);
+    }
+  }
+
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+      applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+    });
+  }
+
+  initTheme();
 
   function formatDate(ms) {
     if (!ms) return '-';

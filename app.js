@@ -4,13 +4,14 @@
 
 (function () {
   const firebaseConfig = {
-    apiKey: "AIzaSyCUeZkAyh1zHDWzDNT_Kiw6HO0Eb6Yz7II",
-    authDomain: "complaint-and-suggestion.firebaseapp.com",
-    databaseURL: "https://complaint-and-suggestion-default-rtdb.firebaseio.com",
-    projectId: "complaint-and-suggestion",
-    storageBucket: "complaint-and-suggestion.firebasestorage.app",
-    messagingSenderId: "188969384619",
-    appId: "1:188969384619:web:abab18f3c2cd7862d855ee",
+    apiKey: "AIzaSyBCcIOD8W0soVVniomLLvffzOIoyVRJWSc",
+    authDomain: "complaint-management-sys-8835c.firebaseapp.com",
+    databaseURL: "https://complaint-management-sys-8835c-default-rtdb.firebaseio.com",
+    projectId: "complaint-management-sys-8835c",
+    storageBucket: "complaint-management-sys-8835c.firebasestorage.app",
+    messagingSenderId: "1075477619881",
+    appId: "1:1075477619881:web:0e74422b65819db1bf75b8",
+    measurementId: "G-KRZ57RHBK1",
   };
 
   firebase.initializeApp(firebaseConfig);
